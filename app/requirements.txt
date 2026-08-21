@@ -1,4 +1,3 @@
-streamlit>=1.38
-databricks-sdk>=0.34
-databricks-sql-connector>=3.4
-pandas>=2.0
+streamlit
+databricks-sdk
+pandas

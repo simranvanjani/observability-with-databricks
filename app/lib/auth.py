@@ -55,13 +55,20 @@ def get_warehouse_id() -> str | None:
     return os.environ.get("DATABRICKS_WAREHOUSE_ID") or None
 
 
-def sql_connection():
-    """Return a databricks-sql-connector connection to the configured warehouse.
+_NUMERIC_TYPES = {"DECIMAL", "DOUBLE", "FLOAT", "LONG", "INT", "SHORT", "BYTE", "BIGINT"}
 
-    Uses the OBO user token when available so reads honor the operator's grants
-    on the ``system`` schemas.
+
+def run_sql(query: str, params: dict | None = None):
+    """Execute a statement via the SDK Statement Execution API → pandas DataFrame.
+
+    Uses the SDK (already bundled with databricks-sdk) rather than
+    databricks-sql-connector, so the app has no heavy native dependency to build
+    at deploy time. Numeric columns are coerced from the string result payload.
     """
-    from databricks import sql as dbsql
+    import time
+
+    import pandas as pd
+    from databricks.sdk.service.sql import StatementState
 
     warehouse_id = get_warehouse_id()
     if not warehouse_id:
@@ -69,22 +76,24 @@ def sql_connection():
             "DATABRICKS_WAREHOUSE_ID is not set. Configure it in the app env "
             "(app.yaml) or deployment settings."
         )
-    host = (_client_host() or "").replace("https://", "").rstrip("/")
-    token = _forwarded_user_token() or get_workspace_client().config.token
-    return dbsql.connect(
-        server_hostname=host,
-        http_path=f"/sql/1.0/warehouses/{warehouse_id}",
-        access_token=token,
-    )
 
+    w = get_workspace_client()
+    resp = w.statement_execution.execute_statement(
+        warehouse_id=warehouse_id, statement=query, wait_timeout="50s")
+    while resp.status and resp.status.state in (StatementState.PENDING, StatementState.RUNNING):
+        time.sleep(1)
+        resp = w.statement_execution.get_statement(resp.statement_id)
 
-def run_sql(query: str, params: dict | None = None):
-    """Execute a read query and return a pandas DataFrame."""
-    import pandas as pd
+    if resp.status and resp.status.state != StatementState.SUCCEEDED:
+        err = resp.status.error.message if resp.status.error else str(resp.status.state)
+        raise RuntimeError(f"SQL failed: {err}")
 
-    with sql_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(query, params or {})
-            cols = [c[0] for c in cur.description] if cur.description else []
-            rows = cur.fetchall()
-    return pd.DataFrame(rows, columns=cols)
+    cols_meta = resp.manifest.schema.columns if (resp.manifest and resp.manifest.schema) else []
+    names = [c.name for c in cols_meta]
+    data = (resp.result.data_array if resp.result else None) or []
+    df = pd.DataFrame(data, columns=names)
+    for c in cols_meta:  # result payload is all strings; restore numeric dtypes
+        tname = str(c.type_name).split(".")[-1].upper()
+        if tname in _NUMERIC_TYPES and c.name in df.columns:
+            df[c.name] = pd.to_numeric(df[c.name], errors="coerce")
+    return df
