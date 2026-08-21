@@ -38,8 +38,11 @@ def get_workspace_client() -> WorkspaceClient:
     """
     token = _forwarded_user_token()
     if token:
+        # auth_type="pat" forces token auth. Without it the SDK also sees the
+        # app's DATABRICKS_CLIENT_ID/SECRET (OAuth-M2M) and errors on ambiguous
+        # ("cannot configure default credentials") auth.
         host = os.environ.get("DATABRICKS_HOST") or _client_host()
-        return WorkspaceClient(host=host, token=token)
+        return WorkspaceClient(host=host, token=token, auth_type="pat")
     return WorkspaceClient()  # SP creds from the app environment / local profile
 
 
