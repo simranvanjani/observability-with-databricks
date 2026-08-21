@@ -19,19 +19,15 @@ _PRICED = """
 
 # ---- COST pillar ----------------------------------------------------------
 def spend_headline(lookback_days: int = 30):
+    # avg daily = total list cost over the window / window length — no self-join needed.
     return run_sql(
         f"""
         SELECT
           round(sum(u.usage_quantity * lp.pricing.effective_list.default), 2) AS list_cost_usd,
           round(sum(CASE WHEN u.usage_date >= date_trunc('MONTH', current_date())
                          THEN u.usage_quantity * lp.pricing.effective_list.default END), 2) AS mtd_cost_usd,
-          round(avg_daily, 2) AS avg_daily_usd
+          round(sum(u.usage_quantity * lp.pricing.effective_list.default) / {lookback_days}, 2) AS avg_daily_usd
         FROM {_PRICED}
-        CROSS JOIN (
-          SELECT sum(u2.usage_quantity * lp2.pricing.effective_list.default) / {lookback_days} AS avg_daily
-          FROM {_PRICED.replace('u.', 'u2.').replace('lp.', 'lp2.').replace(' u ', ' u2 ').replace(' lp ', ' lp2 ')}
-          WHERE u2.usage_date >= current_date() - INTERVAL {lookback_days} DAYS
-        )
         WHERE u.usage_date >= current_date() - INTERVAL {lookback_days} DAYS
         """
     )
