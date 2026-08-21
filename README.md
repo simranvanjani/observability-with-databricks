@@ -12,6 +12,9 @@ A runnable Databricks notebook bundle for a 3-session cost-management, tagging, 
 
 Each topic: **📖 Concept → 🛠️ Implementation guide → ▶️ Runnable example.**
 
+## App: Observability Setup Center
+`app/` is a **Streamlit Databricks App** — a one-stop UI where a customer assesses posture and applies setup (tagging, budgets, policies, AI Gateway, governed tags), every write following **Assess → Preview → Apply**. It includes a **natural-language alert builder**: describe an alert in plain English and it's translated to SQL over system tables, shown for review, then created as a Databricks SQL Alert. See [`app/README.md`](app/README.md). The notebooks are the "under the hood" teaching companion.
+
 ## Prerequisites
 - Unity Catalog + `system` schemas enabled (`billing`, `access`, `compute`, `lakeflow`, `serving`)
 - A SQL warehouse; `SELECT` on `system.billing`

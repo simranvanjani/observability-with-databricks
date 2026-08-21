@@ -1,0 +1,13 @@
+# Databricks App configuration.
+# Deploy with:  databricks apps deploy observability-setup-center --source-code-path <workspace path>
+command: ["streamlit", "run", "app.py"]
+
+env:
+  # SQL warehouse used for all system.* reads. Set to your warehouse id in the app's
+  # deployment settings (Compute -> SQL warehouses -> your warehouse -> ID).
+  - name: DATABRICKS_WAREHOUSE_ID
+    value: ""
+  - name: STREAMLIT_SERVER_HEADLESS
+    value: "true"
+  - name: STREAMLIT_BROWSER_GATHER_USAGE_STATS
+    value: "false"
